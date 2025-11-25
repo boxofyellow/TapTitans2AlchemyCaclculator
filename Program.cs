@@ -222,7 +222,7 @@ foreach (var reward in rewardCosts.Keys.OrderBy(x => x))
     }
 }
 
-var targetedReward = "Wildcards";
+var targetedReward = "Raid Cards";
 
 // Maximize crafting the target reward
 Console.WriteLine($"\n\n=== OPTIMIZING FOR TARGET REWARD: {targetedReward} ===\n");
