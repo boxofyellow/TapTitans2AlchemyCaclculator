@@ -221,3 +221,172 @@ foreach (var reward in rewardCosts.Keys.OrderBy(x => x))
 }
 
 var targetedReward = "Wildcards";
+
+// Maximize crafting the target reward
+Console.WriteLine($"\n\n=== OPTIMIZING FOR TARGET REWARD: {targetedReward} ===\n");
+
+if (!rewardCosts.ContainsKey(targetedReward))
+{
+    Console.WriteLine($"Target reward '{targetedReward}' not found in recipes!");
+    return;
+}
+
+// Get all recipes for the target reward, ordered by efficiency (quantity per base ingredient)
+var targetRecipes = rewardCosts[targetedReward]
+    .OrderByDescending(r => (double)r.Quantity / r.Cost.Sum(c => c.Value))
+    .ToList();
+
+// Create a working copy of inventory
+var workingInventory = new Dictionary<string, int>(inventory);
+
+// Track total rewards obtained and crafting steps
+var totalRewards = 0;
+var craftingPlan = new List<(string Action, string Ingredient1, string Ingredient2, int Quantity, string Details)>();
+
+// Helper function to check if we can craft an ingredient
+bool canCraftIngredient(string ingredient, Dictionary<string, int> currentInventory)
+{
+    if (currentInventory.GetValueOrDefault(ingredient, 0) > 0)
+        return true;
+    
+    if (!creationRecipes.ContainsKey(ingredient))
+        return false;
+    
+    var (ing1, ing2) = creationRecipes[ingredient];
+    return canCraftIngredient(ing1, currentInventory) && canCraftIngredient(ing2, currentInventory);
+}
+
+// Helper function to craft an ingredient (recursively if needed)
+bool tryCraftIngredient(string ingredient, Dictionary<string, int> currentInventory, List<(string, string, string, string)> steps)
+{
+    if (currentInventory.GetValueOrDefault(ingredient, 0) > 0)
+    {
+        currentInventory[ingredient]--;
+        return true;
+    }
+    
+    if (!creationRecipes.ContainsKey(ingredient))
+        return false;
+    
+    var (ing1, ing2) = creationRecipes[ingredient];
+    
+    if (tryCraftIngredient(ing1, currentInventory, steps) && tryCraftIngredient(ing2, currentInventory, steps))
+    {
+        steps.Add(("CREATE", ing1, ing2, ingredient));
+        currentInventory[ingredient] = currentInventory.GetValueOrDefault(ingredient, 0) + 1;
+        currentInventory[ingredient]--;
+        return true;
+    }
+    
+    return false;
+}
+
+Console.WriteLine("=== PHASE 1: Using existing complex ingredients ===\n");
+
+// Phase 1: Prioritize using complex ingredients to minimize waste
+foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
+{
+    while (true)
+    {
+        var steps = new List<(string, string, string, string)>();
+        var testInventory = new Dictionary<string, int>(workingInventory);
+        
+        if (tryCraftIngredient(ing1, testInventory, steps) && tryCraftIngredient(ing2, testInventory, steps))
+        {
+            // Calculate how many complex ingredients we used
+            var complexUsed = steps.Count(s => s.Item1 == "CREATE");
+            
+            // Only proceed if we're using at least one complex ingredient in this phase
+            if (complexUsed == 0)
+                break;
+            
+            // Apply the crafting
+            workingInventory = testInventory;
+            
+            // Log intermediate crafting steps
+            foreach (var (action, i1, i2, result) in steps)
+            {
+                craftingPlan.Add((action, i1, i2, 1, $"Creating {result}"));
+            }
+            
+            // Log the recipe execution
+            craftingPlan.Add(("CRAFT", ing1, ing2, quantity, $"Yielding {quantity} x {targetedReward}"));
+            totalRewards += quantity;
+            
+            Console.WriteLine($"Crafted ({ing1}, {ing2}) => {quantity} x {targetedReward}");
+            if (steps.Count > 0)
+            {
+                Console.WriteLine($"  Required creating: {string.Join(", ", steps.Select(s => s.Item4))}");
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+Console.WriteLine($"\nPhase 1 complete. Total rewards so far: {totalRewards}");
+Console.WriteLine($"Remaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}\n");
+
+Console.WriteLine("=== PHASE 2: Using remaining base ingredients ===\n");
+
+// Phase 2: Use base ingredients efficiently
+foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
+{
+    while (true)
+    {
+        var steps = new List<(string, string, string, string)>();
+        var testInventory = new Dictionary<string, int>(workingInventory);
+        
+        if (tryCraftIngredient(ing1, testInventory, steps) && tryCraftIngredient(ing2, testInventory, steps))
+        {
+            // Apply the crafting
+            workingInventory = testInventory;
+            
+            // Log intermediate crafting steps
+            foreach (var (action, i1, i2, result) in steps)
+            {
+                if (action == "CREATE")
+                    craftingPlan.Add((action, i1, i2, 1, $"Creating {result}"));
+            }
+            
+            // Log the recipe execution
+            craftingPlan.Add(("CRAFT", ing1, ing2, quantity, $"Yielding {quantity} x {targetedReward}"));
+            totalRewards += quantity;
+            
+            Console.WriteLine($"Crafted ({ing1}, {ing2}) => {quantity} x {targetedReward}");
+            if (steps.Count > 0)
+            {
+                var createdIngredients = steps.Where(s => s.Item1 == "CREATE").Select(s => s.Item4);
+                if (createdIngredients.Any())
+                {
+                    Console.WriteLine($"  Required creating: {string.Join(", ", createdIngredients)}");
+                }
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+Console.WriteLine($"\n=== OPTIMIZATION COMPLETE ===");
+Console.WriteLine($"Total {targetedReward} obtained: {totalRewards}");
+Console.WriteLine($"\nRemaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}\n");
+
+Console.WriteLine("\n=== DETAILED CRAFTING PLAN ===\n");
+var stepNumber = 1;
+foreach (var (action, ing1, ing2, qty, details) in craftingPlan)
+{
+    if (action == "CREATE")
+    {
+        Console.WriteLine($"{stepNumber}. Combine {ing1} + {ing2} to create intermediate ingredient");
+    }
+    else
+    {
+        Console.WriteLine($"{stepNumber}. Combine {ing1} + {ing2} => {qty} x {targetedReward}");
+    }
+    stepNumber++;
+}
