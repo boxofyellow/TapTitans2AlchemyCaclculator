@@ -1,8 +1,13 @@
-﻿// Parse optional command line argument for targeted reward
+// Parse optional command line argument for targeted reward
 var targetedReward = "Wildcards";
 if (args.Length > 0)
 {
     targetedReward = args[0];
+}
+
+if (targetedReward == "Wildcards")
+{
+    throw new ApplicationException("BOOM!");
 }
 
 string[] recipeData = File.ReadAllLines("recipeData.csv");
@@ -431,4 +436,5 @@ Console.WriteLine("Ingredient,Quantity");
 foreach (var ingredient in ingredients)
 {
     Console.WriteLine($"{ingredient},{workingInventory.GetValueOrDefault(ingredient, 0)}");
+
 }
