@@ -17,61 +17,6 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'alchemy-calculator')
     
     steps:
-      - name: Determine checkout ref
-        id: checkout-ref
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const isPR = !!context.payload.issue?.pull_request;
-            
-            if (isPR) {
-              // For PRs, get the PR details to find the head SHA
-              // Using SHA instead of ref name to support cross-fork PRs
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number
-              });
-              const headSha = pr.data.head.sha;
-              console.log(`PR detected, using head SHA: ${headSha}`);
-              core.setOutput('ref', headSha);
-              return;
-            }
-            
-            // For issues, check if a branch/sha is specified in the issue body
-            const issueBody = context.payload.issue?.body || '';
-            
-            // Parse branch/sha - handle both form format and markdown format
-            // Form format: ### Branch/SHA (Optional)\n\nValue
-            // Markdown format: ## Branch/SHA (Optional)\nValue
-            let branchSha = '';
-            const branchMatch = issueBody.match(/###?\s*Branch\/SHA\s*\(Optional\)\s*\n+([^\n#]+)/i);
-            if (branchMatch) {
-              branchSha = branchMatch[1].trim();
-            }
-            
-            // Check for valid branch/sha value
-            // GitHub forms use '_No response_' for empty optional fields
-            const isEmptyResponse = !branchSha || branchSha.startsWith('_') || branchSha === '';
-            
-            if (!isEmptyResponse) {
-              console.log(`Branch/SHA specified in issue: ${branchSha}`);
-              core.setOutput('ref', branchSha);
-            } else {
-              console.log('No branch/SHA specified, using default branch');
-              core.setOutput('ref', '');
-            }
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.checkout-ref.outputs.ref || github.ref }}
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Determine input source and add eyes reaction
         id: get-input
         uses: actions/github-script@v7
@@ -181,6 +126,27 @@ jobs:
               }
             }
             
+            // Parse branch/sha from the input body (issue body or last comment)
+            // Form format: ### Branch/SHA (Optional)\n\nValue
+            // Markdown format: ## Branch/SHA (Optional)\nValue
+            let branchSha = '';
+            const branchMatch = inputBody.match(/###?\s*Branch\/SHA\s*\(Optional\)\s*\n+([^\n#]+)/i);
+            if (branchMatch) {
+              branchSha = branchMatch[1].trim();
+            }
+            
+            // Check for valid branch/sha value
+            // GitHub forms use '_No response_' for empty optional fields
+            const isEmptyResponse = !branchSha || branchSha.startsWith('_') || branchSha === '';
+            
+            if (!isEmptyResponse) {
+              console.log(`Branch/SHA specified: ${branchSha}`);
+              core.setOutput('branch_sha', branchSha);
+            } else {
+              console.log('No branch/SHA specified, will use default branch');
+              core.setOutput('branch_sha', '');
+            }
+            
             // Store values for later steps - write to files to avoid shell escaping issues
             fs.writeFileSync('/tmp/targeted_reward.txt', targetedReward);
             core.setOutput('has_targeted_reward', targetedReward.length > 0 ? 'true' : 'false');
@@ -191,6 +157,47 @@ jobs:
             // Write inventory data to a file to avoid shell escaping issues
             fs.writeFileSync('/tmp/inventory_data.txt', inventoryData);
             core.setOutput('has_inventory', inventoryData.length > 0 ? 'true' : 'false');
+
+      - name: Determine checkout ref
+        id: checkout-ref
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isPR = '${{ steps.get-input.outputs.is_pr }}' === 'true';
+            const branchSha = '${{ steps.get-input.outputs.branch_sha }}';
+            
+            if (isPR) {
+              // For PRs, get the PR details to find the head SHA
+              // Using SHA instead of ref name to support cross-fork PRs
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+              const headSha = pr.data.head.sha;
+              console.log(`PR detected, using head SHA: ${headSha}`);
+              core.setOutput('ref', headSha);
+              return;
+            }
+            
+            // For issues, use the branch/sha from the input if specified
+            if (branchSha) {
+              console.log(`Using branch/SHA from input: ${branchSha}`);
+              core.setOutput('ref', branchSha);
+            } else {
+              console.log('No branch/SHA specified, using default branch');
+              core.setOutput('ref', '');
+            }
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.checkout-ref.outputs.ref || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Validate inputs for issues
         id: validate-inputs
