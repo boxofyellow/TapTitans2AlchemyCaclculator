@@ -43,25 +43,24 @@ body:
     id: inventory-data
     attributes:
       label: Inventory Data
-      description: Enter your current inventory in the table format below
+      description: Enter your current inventory in CSV format below
       value: |
-        | Ingredient | Quantity |
-        |------------|----------|
-        | Leaf | 0 |
-        | Sand | 0 |
-        | Flame | 0 |
-        | Pepper | 0 |
-        | Steel | 0 |
-        | Feather | 0 |
-        | Beetle | 0 |
-        | Lightning | 0 |
-        | Scale | 0 |
-        | Crystal | 0 |
-        | Tooth | 0 |
-        | Egg | 0 |
-        | Shadow | 0 |
-        | Spirit | 0 |
-        | Essence | 0 |
-        | Power | 0 |
+        Ingredient,Quantity
+        Leaf,0
+        Sand,0
+        Flame,0
+        Pepper,0
+        Steel,0
+        Feather,0
+        Beetle,0
+        Lightning,0
+        Scale,0
+        Crystal,0
+        Tooth,0
+        Egg,0
+        Shadow,0
+        Spirit,0
+        Essence,0
+        Power,0
     validations:
       required: true

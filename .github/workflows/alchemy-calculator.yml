@@ -14,9 +14,7 @@ permissions:
 jobs:
   run-calculator:
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'alchemy-calculator')) ||
-      (github.event_name == 'issue_comment' && contains(github.event.issue.labels.*.name, 'alchemy-calculator'))
+    if: contains(github.event.issue.labels.*.name, 'alchemy-calculator')
     
     steps:
       - name: Checkout repository
@@ -38,6 +36,15 @@ jobs:
             
             let inputBody = '';
             let reactionTarget = {};
+            
+            // Post link to workflow run as early as possible
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🔄 Alchemy Calculator workflow started! [View run](${runUrl})`
+            });
             
             if (isIssueComment) {
               // For issue_comment events, use the comment body
@@ -103,26 +110,21 @@ jobs:
               targetedReward = rewardMatch[1].trim();
             }
             
-            // Parse inventory data - handle both form format and markdown format
-            // Look for table content after "Inventory Data" header
+            // Parse inventory data - handle CSV format
+            // Look for content after "Inventory Data" header
             let inventoryData = '';
             const inventoryMatch = inputBody.match(/###?\s*Inventory Data\s*\n+([\s\S]*?)(?=\n###|$)/i);
             if (inventoryMatch) {
-              // Extract table content and convert to CSV
-              const tableContent = inventoryMatch[1].trim();
-              const lines = tableContent.split('\n');
+              // Extract CSV content directly
+              const csvContent = inventoryMatch[1].trim();
+              const lines = csvContent.split('\n');
               const csvLines = [];
               
               for (const line of lines) {
-                // Skip separator lines (|---|---|)
-                if (line.match(/^\|[\s\-:|]+\|$/)) continue;
-                
-                // Parse table rows
-                const rowMatch = line.match(/^\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|$/);
-                if (rowMatch) {
-                  const col1 = rowMatch[1].trim();
-                  const col2 = rowMatch[2].trim();
-                  csvLines.push(`${col1},${col2}`);
+                const trimmedLine = line.trim();
+                // Check if line is a valid CSV line (contains comma and has values)
+                if (trimmedLine && trimmedLine.includes(',')) {
+                  csvLines.push(trimmedLine);
                 }
               }
               
@@ -141,15 +143,6 @@ jobs:
             // Write inventory data to a file to avoid shell escaping issues
             fs.writeFileSync('/tmp/inventory_data.txt', inventoryData);
             core.setOutput('has_inventory', inventoryData.length > 0 ? 'true' : 'false');
-            
-            // Post link to workflow run
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `🔄 Alchemy Calculator workflow started! [View run](${runUrl})`
-            });
 
       - name: Validate inputs for issues
         if: steps.get-input.outputs.is_pr != 'true' && (steps.get-input.outputs.has_targeted_reward != 'true' || steps.get-input.outputs.has_inventory != 'true')
@@ -176,24 +169,23 @@ jobs:
             Wildcards
 
             ## Inventory Data
-            | Ingredient | Quantity |
-            |------------|----------|
-            | Leaf | 5 |
-            | Sand | 3 |
-            | Flame | 2 |
-            | Pepper | 1 |
-            | Steel | 4 |
-            | Feather | 0 |
-            | Beetle | 0 |
-            | Lightning | 0 |
-            | Scale | 0 |
-            | Crystal | 0 |
-            | Tooth | 0 |
-            | Egg | 0 |
-            | Shadow | 0 |
-            | Spirit | 0 |
-            | Essence | 0 |
-            | Power | 2 |
+            Ingredient,Quantity
+            Leaf,5
+            Sand,3
+            Flame,2
+            Pepper,1
+            Steel,4
+            Feather,0
+            Beetle,0
+            Lightning,0
+            Scale,0
+            Crystal,0
+            Tooth,0
+            Egg,0
+            Shadow,0
+            Spirit,0
+            Essence,0
+            Power,2
 
             Valid rewards include: Currency, Wildcards, Skill Points, Raid Cards, Pet Eggs, Hero Weapons, Crafting Shards, Perks, Fortune Weapons, Clan Scroll, Fortune Scroll, and various equipment types.`;
             
@@ -210,38 +202,34 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 comment_id: reactionTarget.comment_id,
-                content: 'x'
+                content: 'confused'
               });
             } else {
               await github.rest.reactions.createForIssue({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: reactionTarget.issue_number,
-                content: 'x'
+                content: 'confused'
               });
             }
             
             core.setFailed('Missing required inputs for issue');
 
       - name: Prepare inventory data
-        if: success()
         run: |
           if [ -s /tmp/inventory_data.txt ]; then
             cp /tmp/inventory_data.txt inventoryData.csv
             echo "Using provided inventory data:"
-            cat inventoryData.csv
           else
             echo "Using default inventory data:"
-            cat inventoryData.csv
           fi
+          cat inventoryData.csv
 
       - name: Build application
-        if: success()
         run: dotnet build --configuration Release
 
       - name: Run application
         id: run-app
-        if: success()
         run: |
           # Read targeted reward from file (safer than shell interpolation)
           if [ -s /tmp/targeted_reward.txt ]; then
@@ -280,25 +268,21 @@ jobs:
               output = 'Failed to read application output';
             }
             
-            let resultEmoji = 'rocket';  // success indicator
+            let resultEmoji = '+1';  // success indicator
             let statusMessage = '✅ Calculation completed successfully!';
             
             if (exitCode !== '0' && exitCode !== '') {
-              resultEmoji = 'x';
+              resultEmoji = 'confused';
               statusMessage = '❌ Calculation failed!';
             }
             
             // Post the output as a comment
             const comment = `${statusMessage}
 
-            <details>
-            <summary>Click to expand full output</summary>
-
             \`\`\`
             ${output}
             \`\`\`
-
-            </details>`;
+            `;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
