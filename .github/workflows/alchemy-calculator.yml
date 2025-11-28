@@ -25,15 +25,16 @@ jobs:
             const isPR = !!context.payload.issue?.pull_request;
             
             if (isPR) {
-              // For PRs, get the PR details to find the head ref
+              // For PRs, get the PR details to find the head SHA
+              // Using SHA instead of ref name to support cross-fork PRs
               const pr = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: context.issue.number
               });
-              const headRef = pr.data.head.ref;
-              console.log(`PR detected, using head ref: ${headRef}`);
-              core.setOutput('ref', headRef);
+              const headSha = pr.data.head.sha;
+              console.log(`PR detected, using head SHA: ${headSha}`);
+              core.setOutput('ref', headSha);
               return;
             }
             
@@ -49,7 +50,11 @@ jobs:
               branchSha = branchMatch[1].trim();
             }
             
-            if (branchSha && branchSha !== '_No response_' && branchSha !== '') {
+            // Check for valid branch/sha value
+            // GitHub forms use '_No response_' for empty optional fields
+            const isEmptyResponse = !branchSha || branchSha.startsWith('_') || branchSha === '';
+            
+            if (!isEmptyResponse) {
               console.log(`Branch/SHA specified in issue: ${branchSha}`);
               core.setOutput('ref', branchSha);
             } else {
