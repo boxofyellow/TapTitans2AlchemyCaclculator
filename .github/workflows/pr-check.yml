@@ -1,0 +1,72 @@
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  run-calculator:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build application
+        run: dotnet build --configuration Release
+
+      - name: Run application
+        id: run-app
+        run: |
+          # Run the application with default settings and capture output
+          set +e
+          OUTPUT=$(dotnet run --configuration Release 2>&1)
+          EXIT_CODE=$?
+          set -e
+          
+          # Save output to file for later use
+          echo "$OUTPUT" > /tmp/app_output.txt
+          
+          # Set output for next step
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+      - name: Post results to PR
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const exitCode = '${{ steps.run-app.outputs.exit_code }}';
+            
+            let output = '';
+            try {
+              output = fs.readFileSync('/tmp/app_output.txt', 'utf8');
+            } catch (e) {
+              output = 'Failed to read application output';
+            }
+            
+            let statusEmoji = '💹';
+            let statusMessage = 'Application ran successfully with default settings';
+            
+            if (exitCode !== '0') {
+              statusEmoji = '❌';
+              statusMessage = 'Application failed to run';
+            }
+            
+            const comment = `${statusEmoji} **PR Check Results**\n\n${statusMessage}\n\n<details>\n<summary>Click to expand output</summary>\n\n\`\`\`\n${output}\n\`\`\`\n\n</details>`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
