@@ -305,6 +305,10 @@ jobs:
           # Save output to file for later use
           echo "$OUTPUT" > /tmp/app_output.txt
           
+          # Write job summary
+          echo "# Alchemy Calculator Results" >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+          
           # Set output for next step
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
@@ -326,19 +330,17 @@ jobs:
             
             let resultEmoji = '+1';  // success indicator
             let statusMessage = '✅ Calculation completed successfully!';
+            let comment = '';
             
             if (exitCode !== '0' && exitCode !== '') {
               resultEmoji = 'confused';
               statusMessage = '❌ Calculation failed!';
+              // Use code block for failed output
+              comment = `${statusMessage}\n\n\`\`\`\n${output}\n\`\`\``;
+            } else {
+              // Use markdown output directly for successful runs
+              comment = `${statusMessage}\n\n${output}`;
             }
-            
-            // Post the output as a comment
-            const comment = `${statusMessage}
-
-            \`\`\`
-            ${output}
-            \`\`\`
-            `;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,

@@ -36,6 +36,10 @@ jobs:
           # Save output to file for later use
           echo "$OUTPUT" > /tmp/app_output.txt
           
+          # Write job summary
+          echo "# PR Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
+          
           # Set output for next step
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
@@ -56,13 +60,17 @@ jobs:
             
             let statusEmoji = '💹';
             let statusMessage = 'Application ran successfully with default settings';
+            let comment = '';
             
             if (exitCode !== '0') {
               statusEmoji = '❌';
               statusMessage = 'Application failed to run';
+              // Use code block for failed output
+              comment = `${statusEmoji} **PR Check Results**\n\n${statusMessage}\n\n<details>\n<summary>Click to expand output</summary>\n\n\`\`\`\n${output}\n\`\`\`\n\n</details>`;
+            } else {
+              // Use markdown output directly for successful runs (wrapped in details)
+              comment = `${statusEmoji} **PR Check Results**\n\n${statusMessage}\n\n<details>\n<summary>Click to expand output</summary>\n\n${output}\n\n</details>`;
             }
-            
-            const comment = `${statusEmoji} **PR Check Results**\n\n${statusMessage}\n\n<details>\n<summary>Click to expand output</summary>\n\n\`\`\`\n${output}\n\`\`\`\n\n</details>`;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,

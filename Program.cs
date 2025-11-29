@@ -6,6 +6,11 @@ if (args.Length > 0)
 }
 
 string[] recipeData = File.ReadAllLines("recipeData.csv");
+
+// Start hidden section for recipe data loading
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>📁 Recipe Data Loading</summary>");
+Console.WriteLine();
 Console.WriteLine($"Loaded {recipeData.Length} lines from recipeData.csv");
 
 var ingredients = new List<string>();
@@ -101,7 +106,16 @@ foreach (var line in recipeData)
     }
 }
 
+// End recipe data loading section
+Console.WriteLine();
+Console.WriteLine("</details>");
+
 string[] inventoryData = File.ReadAllLines("inventoryData.csv");
+
+// Start hidden section for inventory data loading
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>📦 Inventory Data Loading</summary>");
+Console.WriteLine();
 Console.WriteLine($"Loaded {inventoryData.Length} lines from inventoryData.csv");
 
 var inventory = new Dictionary<string, int>();
@@ -150,6 +164,10 @@ foreach (var line in inventoryData)
     inventory[ingredient] = quantity;
 }
 
+// End inventory data loading section
+Console.WriteLine();
+Console.WriteLine("</details>");
+
 foreach (var ingredient in ingredients)
 {
     if (!inventory.ContainsKey(ingredient))
@@ -159,6 +177,11 @@ foreach (var ingredient in ingredients)
 }
 
 var ingredientCost = new Dictionary<string, Dictionary<string, int>>();
+
+// Start hidden section for recipe analysis
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>📈 Recipe Analysis</summary>");
+Console.WriteLine();
 
 foreach (var ingredient in creationRecipes.Keys)
 {
@@ -227,8 +250,14 @@ foreach (var reward in rewardCosts.Keys.OrderBy(x => x))
     }
 }
 
+// End recipe analysis section
+Console.WriteLine();
+Console.WriteLine("</details>");
+
 // Maximize crafting the target reward
-Console.WriteLine($"\n\n=== OPTIMIZING FOR TARGET REWARD: {targetedReward} ===\n");
+Console.WriteLine();
+Console.WriteLine($"## 🎯 OPTIMIZING FOR TARGET REWARD: {targetedReward}");
+Console.WriteLine();
 
 if (!rewardCosts.ContainsKey(targetedReward))
 {
@@ -290,7 +319,10 @@ bool tryCraftIngredient(string ingredient, Dictionary<string, int> currentInvent
     return false;
 }
 
-Console.WriteLine("=== PHASE 1: Using existing complex ingredients ===\n");
+// Start hidden section for Phase 1
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>⚗️ PHASE 1: Using existing complex ingredients</summary>");
+Console.WriteLine();
 
 // Phase 1: Prioritize using complex ingredients to minimize waste
 foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
@@ -338,9 +370,16 @@ foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
 }
 
 Console.WriteLine($"\nPhase 1 complete. Total rewards so far: {totalRewards}");
-Console.WriteLine($"Remaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}\n");
+Console.WriteLine($"Remaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}");
 
-Console.WriteLine("=== PHASE 2: Using remaining base ingredients ===\n");
+// End Phase 1 section
+Console.WriteLine();
+Console.WriteLine("</details>");
+
+// Start hidden section for Phase 2
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>⚗️ PHASE 2: Using remaining base ingredients</summary>");
+Console.WriteLine();
 
 // Phase 2: Use base ingredients efficiently
 foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
@@ -385,26 +424,42 @@ foreach (var (ing1, ing2, quantity, cost) in targetRecipes)
     }
 }
 
-Console.WriteLine($"\n=== OPTIMIZATION COMPLETE ===");
-Console.WriteLine($"Total {targetedReward} obtained: {totalRewards}");
-Console.WriteLine($"\nRemaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}\n");
+// End Phase 2 section
+Console.WriteLine();
+Console.WriteLine("</details>");
 
-Console.WriteLine("\n=== DETAILED CRAFTING PLAN ===\n");
+// Start hidden section for Optimization Complete
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>✅ OPTIMIZATION COMPLETE</summary>");
+Console.WriteLine();
+Console.WriteLine($"**Total {targetedReward} obtained: {totalRewards}**");
+Console.WriteLine();
+Console.WriteLine($"Remaining inventory: {string.Join(", ", workingInventory.Where(kv => kv.Value > 0).Select(kv => $"{kv.Value} x {kv.Key}"))}");
+
+// End Optimization Complete section
+Console.WriteLine();
+Console.WriteLine("</details>");
+
+Console.WriteLine();
+Console.WriteLine("## 📋 DETAILED CRAFTING PLAN");
+Console.WriteLine();
 var stepNumber = 1;
 foreach (var (action, ing1, ing2, qty, details) in craftingPlan)
 {
     if (action == "CREATE")
     {
-        Console.WriteLine($"{stepNumber}. Combine {ing1} + {ing2} to create intermediate ingredient - {details}");
+        Console.WriteLine($"{stepNumber}. Combine **{ing1}** + **{ing2}** to create intermediate ingredient - {details}");
     }
     else
     {
-        Console.WriteLine($"{stepNumber}. Combine {ing1} + {ing2} => {qty} x {targetedReward}");
+        Console.WriteLine($"{stepNumber}. Combine **{ing1}** + **{ing2}** => {qty} x {targetedReward}");
     }
     stepNumber++;
 }
 
-Console.WriteLine("\n=== RECIPE SUMMARY ===\n");
+Console.WriteLine();
+Console.WriteLine("## 📊 RECIPE SUMMARY");
+Console.WriteLine();
 var recipeCounts = new Dictionary<(string, string), int>();
 
 foreach (var (action, ing1, ing2, qty, details) in craftingPlan)
@@ -418,17 +473,27 @@ foreach (var ((ing1, ing2), count) in recipeCounts.OrderByDescending(kv => kv.Va
     var recipeKey = (ing1, ing2);
     if (recipes.TryGetValue(recipeKey, out var recipeResult))
     {
-        Console.WriteLine($"({ing1} + {ing2}) => {recipeResult.Quantity} x {recipeResult.Result}: Execute {count} time(s)");
+        Console.WriteLine($"- **({ing1} + {ing2})** => {recipeResult.Quantity} x {recipeResult.Result}: Execute {count} time(s)");
     }
     else
     {
-        Console.WriteLine($"({ing1} + {ing2}): Execute {count} time(s)");
+        Console.WriteLine($"- **({ing1} + {ing2})**: Execute {count} time(s)");
     }
 }
 
-Console.WriteLine("\n=== REMAINING INVENTORY (CSV FORMAT) ===\n");
+// Start hidden section for Remaining Inventory
+Console.WriteLine();
+Console.WriteLine("<details>");
+Console.WriteLine("<summary>📦 REMAINING INVENTORY (CSV FORMAT)</summary>");
+Console.WriteLine();
+Console.WriteLine("```csv");
 Console.WriteLine("Ingredient,Quantity");
 foreach (var ingredient in ingredients)
 {
     Console.WriteLine($"{ingredient},{workingInventory.GetValueOrDefault(ingredient, 0)}");
 }
+Console.WriteLine("```");
+
+// End Remaining Inventory section
+Console.WriteLine();
+Console.WriteLine("</details>");
